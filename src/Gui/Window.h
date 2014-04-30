@@ -118,6 +118,10 @@ private slots:
     void showContextMenuMsgListTree(const QPoint &position);
     void slotReloadMboxList();
     void slotResyncMbox();
+
+    void slotSelectMailbox(const QModelIndex &);
+    void slotMboxTreeChanged();
+
     void alertReceived(const QString &message);
     void networkPolicyOffline();
     void networkPolicyExpensive();
@@ -216,6 +220,7 @@ private:
     void connectModelActions();
 
     void createMailboxBelow(const QModelIndex &index);
+    QString mailboxIndexName(const QModelIndex &index);
 
     void updateActionsOnlineOffline(bool online);
 
@@ -338,6 +343,7 @@ private:
 
     QSystemTrayIcon *m_trayIcon;
     QPoint m_headerDragStart;
+    QString m_lastMailboxSelected;
 };
 
 }

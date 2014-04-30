@@ -56,6 +56,7 @@
 #include "Composer/Mailto.h"
 #include "Composer/SenderIdentitiesModel.h"
 #include "Imap/Model/ImapAccess.h"
+#include "Imap/Model/ItemRoles.h"
 #include "Imap/Model/MailboxTree.h"
 #include "Imap/Model/Model.h"
 #include "Imap/Model/ModelWatcher.h"
@@ -108,6 +109,8 @@ MainWindow::MainWindow(QSettings *settings): QMainWindow(), m_imapAccess(0),
     m_mainHSplitter(0), m_mainVSplitter(0), m_mainStack(0), m_layoutMode(LAYOUT_COMPACT), m_skipSavingOfUI(true),
     m_delayedStateSaving(0), m_actionSortNone(0), m_ignoreStoredPassword(false), m_settings(settings), m_pluginManager(0), m_trayIcon(0)
 {
+
+    qDebug() << "Queria:: Starting";
     // m_pluginManager must be created before calling createWidgets
     m_pluginManager = new Plugins::PluginManager(this, m_settings,
                                                  Common::SettingsNames::addressbookPlugin, Common::SettingsNames::passwordPlugin);
@@ -678,8 +681,9 @@ void MainWindow::setupModels()
     prettyMsgListModel->setSourceModel(qobject_cast<QAbstractItemModel *>(m_imapAccess->threadingMsgListModel()));
     prettyMsgListModel->setObjectName(QLatin1String("prettyMsgListModel"));
 
-    connect(mboxTree, SIGNAL(clicked(const QModelIndex &)), m_imapAccess->msgListModel(), SLOT(setMailbox(const QModelIndex &)));
-    connect(mboxTree, SIGNAL(activated(const QModelIndex &)), m_imapAccess->msgListModel(), SLOT(setMailbox(const QModelIndex &)));
+    connect(mboxTree, SIGNAL(clicked(const QModelIndex &)), this, SLOT(slotSelectMailbox(const QModelIndex &)));
+    connect(mboxTree, SIGNAL(activated(const QModelIndex &)), this, SLOT(slotSelectMailbox(const QModelIndex &)));
+    connect(prettyMboxModel, SIGNAL(dataChanged(const QModelIndex &, const QModelIndex &)), this, SLOT(slotMboxTreeChanged()));
     connect(m_imapAccess->msgListModel(), SIGNAL(dataChanged(QModelIndex,QModelIndex)), this, SLOT(updateMessageFlags()));
     connect(m_imapAccess->msgListModel(), SIGNAL(messagesAvailable()), msgListWidget->tree, SLOT(scrollToBottom()));
     connect(m_imapAccess->msgListModel(), SIGNAL(rowsInserted(QModelIndex,int,int)), msgListWidget, SLOT(slotAutoEnableDisableSearch()));
@@ -1028,6 +1032,25 @@ void MainWindow::slotResyncMbox()
             continue;
         imapModel()->resyncMailbox(item);
     }
+}
+
+void MainWindow::slotMboxTreeChanged()
+{
+    Q_FOREACH(const QModelIndex &item, mboxTree->selectionModel()->selectedIndexes()) {
+        Q_ASSERT(item.isValid());
+        if (item.column() != 0)
+            continue;
+        qDebug() << "Queria:: Reloading - selected" << item.row() \
+            << "and item" << item \
+            << "trans" << prettyMboxModel->data(item, Imap::Mailbox::RoleMailboxName);
+    }
+}
+
+void MainWindow::slotSelectMailbox(const QModelIndex &selectedIndex)
+{
+    // TODO(psedlak): remember selected mbox name
+    m_lastMailboxSelected = mailboxIndexName(selectedIndex);
+    m_imapAccess->msgListModel()->setMailbox(selectedIndex);
 }
 
 void MainWindow::alertReceived(const QString &message)
@@ -1401,6 +1424,11 @@ void MainWindow::slotDeleteCurrentMailbox()
                               QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
         imapModel()->deleteMailbox(name);
     }
+}
+
+void MainWindow::mailboxIndexName(const QModelIndex &index)
+{
+    return prettyMboxModel->data(index, Imap::Mailbox::RoleMailboxName).toString();
 }
 
 void MainWindow::updateMessageFlags()
